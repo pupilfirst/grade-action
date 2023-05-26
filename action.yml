@@ -1,13 +1,14 @@
-name: 'Pupilfirst Report'
-description: 'Report test status for a submission in Pupilfirst LMS'
+name: 'Pupilfirst Grading'
+description: 'Grade a submission in Pupilfirst LMS'
 author: 'pupilfirst'
 inputs:
+  fail_submission:
+    description: Set the value to true if submission needs to be rejected. Will ignore results in report file.
+    default: false
+  feedback:
+    description: Feedback text that will be used in the absence of report file, and when fail_submission input is used.
   report_file_path:
     description: Relative path of the report JSON file that holds the test data
-  status:
-    description: Status to report to the LMS - queued/in_progress/success/failure/error. Only one of report_file_path or status to be used.
-  description:
-    description: Description for the reported status
   test_mode:
     description: Set to true for debugging
     default: false

@@ -1,8 +1,8 @@
 {
-  "name": "report-action",
+  "name": "grade-action",
   "version": "0.0.0",
   "private": true,
-  "description": "Action used to report the status of the automated tests to the LMS",
+  "description": "Action used to grade a submission in the LMS",
   "main": "lib/main.js",
   "scripts": {
     "build": "tsc",
@@ -15,7 +15,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pupilfirst/report-action"
+    "url": "git+https://github.com/pupilfirst/grade-action"
   },
   "keywords": [
     "actions",

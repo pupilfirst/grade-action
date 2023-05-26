@@ -7,210 +7,124 @@ import {GraphQLClient, gql} from 'graphql-request'
 
 const endpoint: string = process.env.REVIEW_END_POINT || ''
 
+interface EvaluationCriteria {
+  id: string
+  pass_grade: number
+}
+
+interface Submission {
+  id: string
+  target: {
+    evaluation_criteria: EvaluationCriteria[]
+  }
+  checklist: JSON
+}
+
+interface ReportData {
+  status: string
+  grade: string
+  feedback: string
+}
+
+interface GradeInput {
+  evaluationCriterionId: string
+  grade: number
+}
+
 const graphQLClient = new GraphQLClient(endpoint, {
   headers: {
     authorization: `Bearer ${process.env.REVIEW_BOT_USER_TOKEN}`
   }
 })
 
-const completedSubmissionReportQuery = gql`
-  mutation CompletedSubmissionReport(
+const mutation = gql`
+  mutation GradeSubmission(
     $submissionId: ID!
-    $report: String
-    $status: SubmissionReportStatus!
-    $reporter: String!
-    $heading: String
+    $grades: [GradeInput!]!
+    $checklist: JSON!
+    $feedback: String
   ) {
-    concludeSubmissionReport(
+    createGrading(
       submissionId: $submissionId
-      report: $report
-      status: $status
-      reporter: $reporter
-      heading: $heading
+      grades: $grades
+      checklist: $checklist
+      feedback: $feedback
     ) {
       success
     }
   }
 `
 
-const inProgressSubmissionReportQuery = gql`
-  mutation InProgressSubmissionReport(
-    $submissionId: ID!
-    $report: String
-    $reporter: String!
-    $heading: String
-  ) {
-    beginProcessingSubmissionReport(
-      submissionId: $submissionId
-      report: $report
-      reporter: $reporter
-      heading: $heading
-    ) {
-      success
-    }
+const readJSON = (filePath: string): any => {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'))
+  } catch (error) {
+    console.error(`Failed to read or parse file at ${filePath}`, error)
+    throw new Error(`Failed to read or parse file at ${filePath}`)
   }
-`
-
-const queuedSubmissionReportQuery = gql`
-  mutation QueuedSubmissionReport(
-    $submissionId: ID!
-    $report: String
-    $reporter: String!
-    $heading: String
-  ) {
-    queueSubmissionReport(
-      submissionId: $submissionId
-      report: $report
-      reporter: $reporter
-      heading: $heading
-    ) {
-      success
-    }
-  }
-`
-
-let submissionData: {
-  id: string
 }
 
-try {
-  submissionData = JSON.parse(
-    fs.readFileSync(
-      path.join(process.env.GITHUB_WORKSPACE || '', 'submission.json'),
-      {encoding: 'utf-8'}
-    )
-  )
-} catch (error) {
-  throw error
+const getGrades = (
+  evaluationCriteria: EvaluationCriteria[],
+  isPassed: boolean
+) => {
+  return evaluationCriteria.map(ec => ({
+    evaluationCriterionId: ec.id,
+    grade: isPassed ? ec.pass_grade : ec.pass_grade - 1
+  }))
 }
 
 const reportFilePath: string = core.getInput('report_file_path')
-
-const statusInput: string = core.getInput('status')
-
-const descriptionInput: string = core.getInput('description')
-
+const fail_submission: boolean = core.getBooleanInput('fail_submission')
+const feedbackInput: string = core.getInput('feedback')
 const testMode: boolean = core.getBooleanInput('test_mode')
 
-let reportDescription: string
+const validStatuses: string[] = ['success', 'failure', 'error']
+const validStatus = (status: string): boolean => validStatuses.includes(status)
 
-interface ReportData {
-  grading: string
-  report: string
-  status: string
+const workspace = process.env.GITHUB_WORKSPACE || ''
+
+let submissionData: Submission = readJSON(
+  path.join(workspace, 'submission.json')
+)
+
+if (!(fail_submission || reportFilePath !== '')) {
+  throw 'Either report file path should be provide or fail submission should be used'
 }
 
-let reportDataFromFile: ReportData | undefined
+const reportData: ReportData = fail_submission
+  ? {}
+  : readJSON(path.join(workspace, reportFilePath))
 
-if (reportFilePath !== '') {
-  try {
-    reportDataFromFile = JSON.parse(
-      fs.readFileSync(
-        path.join(process.env.GITHUB_WORKSPACE || '', reportFilePath),
-        {encoding: 'utf-8'}
-      )
-    )
-  } catch (error) {
-    throw error
-  }
+if (!fail_submission && !reportData) {
+  throw 'Could not determine pass or fail status of the submission, Either report file path should be provide or fail submission should be used'
 }
 
-const reportIfGraded = (reportData: ReportData): string => {
-  const grading: string = reportData.grading
+const skip: boolean = reportData?.grade === 'skip'
 
-  const report: string =
-    grading === 'reject'
-      ? 'Submission will be eventually rejected and feedback will be shared.'
-      : ''
+const grades = getGrades(
+  submissionData.target.evaluation_criteria,
+  reportData?.status === 'success'
+)
 
-  return report
-}
-
-const truncateReport = (reportText: string): string => {
-  if (typeof reportText !== 'string') {
-    return reportText
-  }
-
-  if (reportText.length > 10000) {
-    return `Report has been truncated because it was longer than 10,000 chars:\n\n---\n\n${reportText.substring(
-      0,
-      9900
-    )}`
-  } else {
-    return reportText
-  }
-}
-
-let reportStatus: string = statusInput
-
-if (reportDataFromFile !== undefined) {
-  reportStatus = reportDataFromFile.status
-  reportDescription =
-    truncateReport(reportDataFromFile.report) ||
-    descriptionInput ||
-    reportIfGraded(reportDataFromFile) ||
-    'Test report unavailable'
-} else {
-  reportDescription = descriptionInput || 'Test report unavailable'
-}
-
-interface ReportVariables {
-  submissionId: string
-  report: string
-  status: string
-  reporter: string
-  heading?: string
-  [key: string]: string | undefined
-}
-
-const variables: ReportVariables = {
+const variables = {
   submissionId: submissionData.id,
-  report: reportDescription,
-  status: reportStatus,
-  reporter: 'Virtual Teaching Assistant'
+  grades: grades,
+  checklist: submissionData.checklist,
+  feedback: reportData?.feedback || feedbackInput
 }
 
 export async function run(): Promise<void> {
   try {
-    let query: string
-    let heading: string
-
-    switch (reportStatus) {
-      case 'queued':
-        query = queuedSubmissionReportQuery
-        heading = 'Automated tests are queued'
-        break
-      case 'in_progress':
-        query = inProgressSubmissionReportQuery
-        heading = 'Automated tests are in progress'
-        break
-      case 'error':
-        query = completedSubmissionReportQuery
-        heading = 'Automated tests errored'
-        break
-      case 'failure':
-        query = completedSubmissionReportQuery
-        heading = 'Automated tests failed'
-        break
-      case 'success':
-        query = completedSubmissionReportQuery
-        heading = 'Automated tests passed'
-        break
-      default:
-        throw new Error(`Invalid submission report status: ${reportStatus}`)
-    }
-
     if (testMode) {
       console.log('variables: ', JSON.stringify(variables, undefined, 2))
-      console.log('heading: ', heading)
-      console.log('query: ', query)
-      console.log('reportDataFromFile: ', reportDataFromFile)
     } else {
-      const data = await graphQLClient.request(query, {
-        ...variables,
-        heading
-      })
-      console.log(JSON.stringify(data, undefined, 2))
+      if (fail_submission || (!skip && validStatus(reportData.status))) {
+        const data = await graphQLClient.request(mutation, variables)
+        console.log(JSON.stringify(data, undefined, 2))
+      } else {
+        console.log('Skipped grading')
+      }
     }
   } catch (error) {
     console.log(error)
