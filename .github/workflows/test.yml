@@ -21,7 +21,6 @@ jobs:
       - uses: actions/checkout@v3
       - uses: ./
         with:
-          status: 'error'
-          description: |
-            Automated tests could not be run successfully. Please ask a member
-            of the Pupilfirst team to look into this submission's VTA logs.
+          fail_submission: true
+          test_mode: true
+          feedback: "This is a test feedback message"
