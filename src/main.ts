@@ -55,6 +55,7 @@ const mutation = gql`
   }
 `
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const readJSON = (filePath: string): any => {
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'))
@@ -67,7 +68,7 @@ const readJSON = (filePath: string): any => {
 const getGrades = (
   evaluationCriteria: EvaluationCriteria[],
   isPassed: boolean
-) => {
+): GradeInput[] => {
   return evaluationCriteria.map(ec => ({
     evaluationCriterionId: ec.id,
     grade: isPassed ? ec.pass_grade : ec.pass_grade - 1
@@ -84,12 +85,14 @@ const validStatus = (status: string): boolean => validStatuses.includes(status)
 
 const workspace = process.env.GITHUB_WORKSPACE || ''
 
-let submissionData: Submission = readJSON(
+const submissionData: Submission = readJSON(
   path.join(workspace, 'submission.json')
 )
 
 if (!(fail_submission || reportFilePath !== '')) {
-  throw 'Either report file path should be provide or fail submission should be used'
+  throw new Error(
+    'Either report file path should be provide or fail submission should be used'
+  )
 }
 
 const reportData: ReportData = fail_submission
@@ -97,19 +100,19 @@ const reportData: ReportData = fail_submission
   : readJSON(path.join(workspace, reportFilePath))
 
 if (!fail_submission && !reportData) {
-  throw 'Could not determine pass or fail status of the submission, Either report file path should be provide or fail submission should be used'
+  throw new Error(
+    'Could not determine pass or fail status of the submission, Either report file path should be provide or fail submission should be used'
+  )
 }
 
 const skip: boolean = reportData?.grade === 'skip'
 
-const grades = getGrades(
-  submissionData.target.evaluation_criteria,
-  reportData?.status === 'success'
-)
-
 const variables = {
   submissionId: submissionData.id,
-  grades: grades,
+  grades: getGrades(
+    submissionData.target.evaluation_criteria,
+    reportData?.status === 'success'
+  ),
   checklist: submissionData.checklist,
   feedback: reportData?.feedback || feedbackInput
 }

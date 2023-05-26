@@ -51,154 +51,77 @@ const graphQLClient = new graphql_request_1.GraphQLClient(endpoint, {
         authorization: `Bearer ${process.env.REVIEW_BOT_USER_TOKEN}`
     }
 });
-const completedSubmissionReportQuery = (0, graphql_request_1.gql) `
-  mutation CompletedSubmissionReport(
+const mutation = (0, graphql_request_1.gql) `
+  mutation GradeSubmission(
     $submissionId: ID!
-    $report: String
-    $status: SubmissionReportStatus!
-    $reporter: String!
-    $heading: String
+    $grades: [GradeInput!]!
+    $checklist: JSON!
+    $feedback: String
   ) {
-    concludeSubmissionReport(
+    createGrading(
       submissionId: $submissionId
-      report: $report
-      status: $status
-      reporter: $reporter
-      heading: $heading
+      grades: $grades
+      checklist: $checklist
+      feedback: $feedback
     ) {
       success
     }
   }
 `;
-const inProgressSubmissionReportQuery = (0, graphql_request_1.gql) `
-  mutation InProgressSubmissionReport(
-    $submissionId: ID!
-    $report: String
-    $reporter: String!
-    $heading: String
-  ) {
-    beginProcessingSubmissionReport(
-      submissionId: $submissionId
-      report: $report
-      reporter: $reporter
-      heading: $heading
-    ) {
-      success
-    }
-  }
-`;
-const queuedSubmissionReportQuery = (0, graphql_request_1.gql) `
-  mutation QueuedSubmissionReport(
-    $submissionId: ID!
-    $report: String
-    $reporter: String!
-    $heading: String
-  ) {
-    queueSubmissionReport(
-      submissionId: $submissionId
-      report: $report
-      reporter: $reporter
-      heading: $heading
-    ) {
-      success
-    }
-  }
-`;
-let submissionData;
-try {
-    submissionData = JSON.parse(fs.readFileSync(path.join(process.env.GITHUB_WORKSPACE || '', 'submission.json'), { encoding: 'utf-8' }));
-}
-catch (error) {
-    throw error;
-}
-const reportFilePath = core.getInput('report_file_path');
-const statusInput = core.getInput('status');
-const descriptionInput = core.getInput('description');
-const testMode = core.getBooleanInput('test_mode');
-let reportDescription;
-let reportDataFromFile;
-if (reportFilePath !== '') {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const readJSON = (filePath) => {
     try {
-        reportDataFromFile = JSON.parse(fs.readFileSync(path.join(process.env.GITHUB_WORKSPACE || '', reportFilePath), { encoding: 'utf-8' }));
+        return JSON.parse(fs.readFileSync(filePath, 'utf8'));
     }
     catch (error) {
-        throw error;
-    }
-}
-const reportIfGraded = (reportData) => {
-    const grading = reportData.grading;
-    const report = grading === 'reject'
-        ? 'Submission will be eventually rejected and feedback will be shared.'
-        : '';
-    return report;
-};
-const truncateReport = (reportText) => {
-    if (typeof reportText !== 'string') {
-        return reportText;
-    }
-    if (reportText.length > 10000) {
-        return `Report has been truncated because it was longer than 10,000 chars:\n\n---\n\n${reportText.substring(0, 9900)}`;
-    }
-    else {
-        return reportText;
+        console.error(`Failed to read or parse file at ${filePath}`, error);
+        throw new Error(`Failed to read or parse file at ${filePath}`);
     }
 };
-let reportStatus = statusInput;
-if (reportDataFromFile !== undefined) {
-    reportStatus = reportDataFromFile.status;
-    reportDescription =
-        truncateReport(reportDataFromFile.report) ||
-            descriptionInput ||
-            reportIfGraded(reportDataFromFile) ||
-            'Test report unavailable';
+const getGrades = (evaluationCriteria, isPassed) => {
+    return evaluationCriteria.map(ec => ({
+        evaluationCriterionId: ec.id,
+        grade: isPassed ? ec.pass_grade : ec.pass_grade - 1
+    }));
+};
+const reportFilePath = core.getInput('report_file_path');
+const fail_submission = core.getBooleanInput('fail_submission');
+const feedbackInput = core.getInput('feedback');
+const testMode = core.getBooleanInput('test_mode');
+const validStatuses = ['success', 'failure', 'error'];
+const validStatus = (status) => validStatuses.includes(status);
+const workspace = process.env.GITHUB_WORKSPACE || '';
+const submissionData = readJSON(path.join(workspace, 'submission.json'));
+if (!(fail_submission || reportFilePath !== '')) {
+    throw new Error('Either report file path should be provide or fail submission should be used');
 }
-else {
-    reportDescription = descriptionInput || 'Test report unavailable';
+const reportData = fail_submission
+    ? {}
+    : readJSON(path.join(workspace, reportFilePath));
+if (!fail_submission && !reportData) {
+    throw new Error('Could not determine pass or fail status of the submission, Either report file path should be provide or fail submission should be used');
 }
+const skip = (reportData === null || reportData === void 0 ? void 0 : reportData.grade) === 'skip';
 const variables = {
     submissionId: submissionData.id,
-    report: reportDescription,
-    status: reportStatus,
-    reporter: 'Virtual Teaching Assistant'
+    grades: getGrades(submissionData.target.evaluation_criteria, (reportData === null || reportData === void 0 ? void 0 : reportData.status) === 'success'),
+    checklist: submissionData.checklist,
+    feedback: (reportData === null || reportData === void 0 ? void 0 : reportData.feedback) || feedbackInput
 };
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            let query;
-            let heading;
-            switch (reportStatus) {
-                case 'queued':
-                    query = queuedSubmissionReportQuery;
-                    heading = 'Automated tests are queued';
-                    break;
-                case 'in_progress':
-                    query = inProgressSubmissionReportQuery;
-                    heading = 'Automated tests are in progress';
-                    break;
-                case 'error':
-                    query = completedSubmissionReportQuery;
-                    heading = 'Automated tests errored';
-                    break;
-                case 'failure':
-                    query = completedSubmissionReportQuery;
-                    heading = 'Automated tests failed';
-                    break;
-                case 'success':
-                    query = completedSubmissionReportQuery;
-                    heading = 'Automated tests passed';
-                    break;
-                default:
-                    throw new Error(`Invalid submission report status: ${reportStatus}`);
-            }
             if (testMode) {
                 console.log('variables: ', JSON.stringify(variables, undefined, 2));
-                console.log('heading: ', heading);
-                console.log('query: ', query);
-                console.log('reportDataFromFile: ', reportDataFromFile);
             }
             else {
-                const data = yield graphQLClient.request(query, Object.assign(Object.assign({}, variables), { heading }));
-                console.log(JSON.stringify(data, undefined, 2));
+                if (fail_submission || (!skip && validStatus(reportData.status))) {
+                    const data = yield graphQLClient.request(mutation, variables);
+                    console.log(JSON.stringify(data, undefined, 2));
+                }
+                else {
+                    console.log('Skipped grading');
+                }
             }
         }
         catch (error) {
