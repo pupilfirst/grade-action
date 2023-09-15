@@ -9,7 +9,7 @@ const endpoint: string = process.env.REVIEW_END_POINT || ''
 
 interface EvaluationCriteria {
   id: string
-  pass_grade: number
+  max_grade: number
 }
 
 interface Submission {
@@ -69,11 +69,13 @@ const getGrades = (
   evaluationCriteria: EvaluationCriteria[],
   isPassed: boolean
 ): GradeInput[] => {
-  return evaluationCriteria.map(ec => ({
+  if (isPassed) {
+    return evaluationCriteria.map(ec => ({
     evaluationCriterionId: ec.id,
-    grade: isPassed ? ec.pass_grade : ec.pass_grade - 1
-  }))
-}
+    grade: ec.max_grade
+  }))} else {
+    return []
+  }}
 
 const reportFilePath: string = core.getInput('report_file_path')
 const fail_submission: boolean = core.getBooleanInput('fail_submission')
