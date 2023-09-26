@@ -79,10 +79,15 @@ const readJSON = (filePath) => {
     }
 };
 const getGrades = (evaluationCriteria, isPassed) => {
-    return evaluationCriteria.map(ec => ({
-        evaluationCriterionId: ec.id,
-        grade: isPassed ? ec.pass_grade : ec.pass_grade - 1
-    }));
+    if (isPassed) {
+        return evaluationCriteria.map(ec => ({
+            evaluationCriterionId: ec.id,
+            grade: ec.max_grade
+        }));
+    }
+    else {
+        return [];
+    }
 };
 const reportFilePath = core.getInput('report_file_path');
 const fail_submission = core.getBooleanInput('fail_submission');
