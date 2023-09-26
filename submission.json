@@ -1,6 +1,39 @@
 {
-  "id": 123,
-  "students": [],
-  "created_at": "2023-03-18T15:30:51.212+05:30",
-  "updated_at": "2023-03-18T15:30:51.212+05:30"
+  "id": 1496714,
+  "students": [110673],
+  "created_at": "2023-08-15T21:25:55.488+05:30",
+  "updated_at": "2023-08-15T21:25:55.488+05:30",
+  "target_id": 18716,
+  "checklist": [
+    {
+      "kind": "files",
+      "title": "Please upload the JS file with the function",
+      "result": ["28119"],
+      "status": "noAnswer"
+    }
+  ],
+  "level_number": 5,
+  "target": {
+    "id": 18716,
+    "title": "Task: Create a function to validate passphrase",
+    "evaluation_criteria": [
+      {
+        "id": 3259,
+        "name": "Acceptance",
+        "max_grade": 1,
+        "grade_labels": [
+          { "grade": 1, "label": "Accepted" }
+        ]
+      }
+    ]
+  },
+  "files": [
+    {
+      "filename": "passphrase.js",
+      "content_type": "text/javascript",
+      "byte_size": 1461,
+      "checksum": "gU75YTm8M01aVF53xOwOwA==",
+      "url": "https://do7js0tdxrds1.cloudfront.net/d7jvz6kpwsyyehmvdou1uz79gxif?response-content-disposition=attachment%3B+filename%3D%22passphrase.js%22%3B\u0026response-content-type=text%2Fjavascript\u0026Expires=1692118562\u0026Signature=cHF-j9SPhFGOGcKb~D6cgyYu3NClLsaP88n0EQVdsPnxZa1lFxvDo1Rvf-VV1CgTSkvWgCQbM3~JSErlnmeUre9oFBLzR2oxa4-g4zCONxjUueXsCFtJmRLlsi5DMJIdPsok4mq7sDbTlZ2RcaUKN5wpUvAeAIWedVARPnPku1cr0jUfWZHa9Qe-hbc1iTCJvjW0YI~1I5MVoDdwvQQ3d8cipG-wRGqvAyaE7fMTEnVa3agu0fuZubcLbWjbLL97DIfXCkvOemo1QdkaU3hGQXlSafXRMBe7YZsAduBsLuSfcIOew7UT7a1ltDAz7g8iqRBhIkBTU~b09iaffWnU7g__\u0026Key-Pair-Id"
+    }
+  ]
 }
