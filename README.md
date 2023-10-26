@@ -21,6 +21,13 @@ The grading action accepts a single input `report_file_path` which is the relati
 
 The valid statuses for grading in `report.json` file are `skip`, `pass`, `fail`. In the absence of a valid `report.json` file or valid `status` keys or missing `feedback`, grading will be skipped.
 
+## How to run locally
+
+You can run the github actions locally using [act](https://github.com/nektos/act). Run the test.yml workflow locally to test local changes in test mode. 
+
+```bash
+act -j 'test'
+```
 ## How to build and release
 
 When releasing a new version, you should always push two tags - the full version tag - `v1.2.3` for example, and the corresponding major version tag - `v1`, for `v1.2.3`. You will need to delete the existing major version tag, and push a replacement tag for each release.

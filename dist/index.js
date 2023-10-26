@@ -54,7 +54,7 @@ const graphQLClient = new graphql_request_1.GraphQLClient(endpoint, {
 const mutation = (0, graphql_request_1.gql) `
   mutation GradeSubmission(
     $submissionId: ID!
-    $grades: [GradeInput!]!
+    $grades: [GradeInput!]
     $checklist: JSON!
     $feedback: String
   ) {
@@ -79,10 +79,15 @@ const readJSON = (filePath) => {
     }
 };
 const getGrades = (evaluationCriteria, isPassed) => {
-    return evaluationCriteria.map(ec => ({
-        evaluationCriterionId: ec.id,
-        grade: isPassed ? ec.pass_grade : ec.pass_grade - 1
-    }));
+    if (isPassed) {
+        return evaluationCriteria.map(ec => ({
+            evaluationCriterionId: ec.id,
+            grade: ec.max_grade
+        }));
+    }
+    else {
+        return [];
+    }
 };
 const reportFilePath = core.getInput('report_file_path');
 const fail_submission = core.getBooleanInput('fail_submission');
@@ -104,10 +109,12 @@ if (!fail_submission && !reportData) {
 const skip = (reportData === null || reportData === void 0 ? void 0 : reportData.grade) === 'skip';
 const variables = {
     submissionId: submissionData.id,
-    grades: getGrades(submissionData.target.evaluation_criteria, (reportData === null || reportData === void 0 ? void 0 : reportData.status) === 'success'),
     checklist: submissionData.checklist,
     feedback: (reportData === null || reportData === void 0 ? void 0 : reportData.feedback) || feedbackInput
 };
+const grades = getGrades(submissionData.target.evaluation_criteria, (reportData === null || reportData === void 0 ? void 0 : reportData.status) === 'success');
+if (grades.length !== 0)
+    variables['grades'] = grades;
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {

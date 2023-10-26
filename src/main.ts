@@ -9,7 +9,7 @@ const endpoint: string = process.env.REVIEW_END_POINT || ''
 
 interface EvaluationCriteria {
   id: string
-  pass_grade: number
+  max_grade: number
 }
 
 interface Submission {
@@ -40,7 +40,7 @@ const graphQLClient = new GraphQLClient(endpoint, {
 const mutation = gql`
   mutation GradeSubmission(
     $submissionId: ID!
-    $grades: [GradeInput!]!
+    $grades: [GradeInput!]
     $checklist: JSON!
     $feedback: String
   ) {
@@ -69,10 +69,14 @@ const getGrades = (
   evaluationCriteria: EvaluationCriteria[],
   isPassed: boolean
 ): GradeInput[] => {
-  return evaluationCriteria.map(ec => ({
-    evaluationCriterionId: ec.id,
-    grade: isPassed ? ec.pass_grade : ec.pass_grade - 1
-  }))
+  if (isPassed) {
+    return evaluationCriteria.map(ec => ({
+      evaluationCriterionId: ec.id,
+      grade: ec.max_grade
+    }))
+  } else {
+    return []
+  }
 }
 
 const reportFilePath: string = core.getInput('report_file_path')
@@ -107,15 +111,23 @@ if (!fail_submission && !reportData) {
 
 const skip: boolean = reportData?.grade === 'skip'
 
-const variables = {
+type Variables = {
+  submissionId: string
+  grades?: GradeInput[]
+  checklist: JSON
+  feedback?: string
+}
+
+const variables: Variables = {
   submissionId: submissionData.id,
-  grades: getGrades(
-    submissionData.target.evaluation_criteria,
-    reportData?.status === 'success'
-  ),
   checklist: submissionData.checklist,
   feedback: reportData?.feedback || feedbackInput
 }
+const grades = getGrades(
+  submissionData.target.evaluation_criteria,
+  reportData?.status === 'success'
+)
+if (grades.length !== 0) variables['grades'] = grades
 
 export async function run(): Promise<void> {
   try {
